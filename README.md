@@ -2,7 +2,7 @@
 
 > **AI Semantic Reference**
 
-**ASR** is a production-ready **Model Context Protocol (MCP) server** that provides deterministic tools for AI assistants.
+**ASR** **Model Context Protocol (MCP) server** that provides deterministic tools for AI assistants.
 
 Instead of relying solely on language model memory, ASR gives AI clients access to structured services through MCP. By exposing reliable tools rather than generated answers, ASR helps build AI applications that are more consistent, testable, and easier to automate.
 
