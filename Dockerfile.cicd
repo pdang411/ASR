@@ -1,0 +1,23 @@
+# Base image for CI/CD
+FROM node:16-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Create minimal package.json using proper JSON syntax
+RUN printf '{\n  "name": "ars-cicd",\n  "version": "1.0.0",\n  "description": "ARS CI/CD Bootstrap",\n  "main": "index.js",\n  "scripts": {\n    "start": "node index.js"\n  },\n  "dependencies": {\n    "express": "^4.18.0"\n  }\n}' > package.json
+
+# Install dependencies
+RUN npm install
+
+# Copy application code 
+COPY . .
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/build
+
+# Expose port for CI service
+EXPOSE 3000
+
+# Default command 
+CMD ["npm", "start"]
