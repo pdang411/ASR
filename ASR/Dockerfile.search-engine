@@ -1,0 +1,20 @@
+# Elasticsearch base image
+FROM docker.elastic.co/elasticsearch/elasticsearch:7.17.0
+
+# Set the user to elasticsearch
+USER elasticsearch
+
+# Configure Elasticsearch
+ENV path.data=/usr/share/elasticsearch/data
+ENV path.logs=/usr/share/elasticsearch/logs
+ENV ES_JAVA_OPTS="-Xms1g -Xmx1g"
+
+# Expose ports
+EXPOSE 9200 9300
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:9200/_health || exit 1
+
+# Default command - don't override the existing entrypoint
+CMD ["elasticsearch"]

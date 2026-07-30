@@ -1,0 +1,52 @@
+services:
+  # Main MCP Server service
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp-server
+    restart: unless-stopped
+    ports:
+      - "8600:8600"
+    environment:
+      - ENV=production
+      - DEBUG=false
+    volumes:
+      - ./data/mcp-server:/app/data
+      - ./logs/mcp-server:/app/logs
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - ars-network
+
+  # Database service 
+  postgres:
+    image: postgres:13-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ars_db
+      POSTGRES_USER: ars_user
+      POSTGRES_PASSWORD: ars_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ars-network
+
+  # Redis cache service
+  redis:
+    image: redis:6-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ars-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  ars-network:
+    driver: bridge
