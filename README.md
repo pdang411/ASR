@@ -98,7 +98,7 @@ Possible actions include:
 
 Design goals:
 
-* Minimize token consumption
+* Minimize token consumption ****
 * Maximize useful LLM work
 * Reuse previous reasoning
 * Keep agents executing in parallel
