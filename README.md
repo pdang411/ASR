@@ -1,10 +1,8 @@
 # ASR
 
-> **AI Semantic Reference**
+**ASR** is a **Model Context Protocol (MCP) server and orchestration runtime** that provides deterministic tools and structured capabilities for AI assistants.
 
-**ASR** **Model Context Protocol (MCP) server** that provides deterministic tools for AI assistants.
-
-Instead of relying solely on language model memory, ASR gives AI clients access to structured services through MCP. By exposing reliable tools rather than generated answers, ASR helps build AI applications that are more consistent, testable, and easier to automate.
+Instead of relying solely on language model memory, ASR gives AI clients access to reliable services through MCP. By exposing deterministic tools rather than generated answers, ASR helps build AI applications that are more consistent, testable, observable, and easier to automate.
 
 Built for developers, ASR is lightweight, extensible, and designed to integrate with any MCP-compatible client.
 
@@ -16,9 +14,9 @@ Large Language Models are excellent at reasoning, but they are not authoritative
 
 ASR adds a deterministic layer between AI assistants and structured information. Rather than asking an LLM to remember everything, ASR exposes reliable tools that return predictable, machine-readable results.
 
-The AI performs the reasoning.
+The language model performs the reasoning.
 
-**ASR provides the capabilities.**
+**ASR provides the capabilities, orchestration, and execution.**
 
 ---
 
@@ -27,105 +25,180 @@ The AI performs the reasoning.
 * **MCP Native** — Built specifically for the Model Context Protocol.
 * **Deterministic Responses** — Structured JSON with predictable schemas.
 * **Model Independent** — Works with any MCP-compatible AI client.
-* **OpenAI-Compatible** — Supports local or remote OpenAI-compatible LLMs through your AI client.
-* **Modular Architecture** — Add new tools without changing the core server.
-* **Developer First** — Clean, simple, and extensible design.
+* **OpenAI-Compatible** — Supports local or remote OpenAI-compatible models through your AI client.
+* **Smart Preemption** — Coordinates agent reasoning requests while minimizing unnecessary LLM usage.
+* **AI.KB Working Memory** — Runtime knowledge, context, and execution state.
+* **Parallel Task Execution** — Maximizes useful work across multiple agents.
+* **Deterministic Routing** — Logic-gate decisions instead of additional AI reasoning.
+* **Modular Architecture** — Add new capabilities without changing the core runtime.
+* **Developer First** — Lightweight, extensible, and easy to integrate.
+* **Raspberry Pi First** — Designed to scale from Raspberry Pi to workstation and cloud environments.
 
 ---
 
 # Architecture
 
 ```text
-                 AI Client
-(OpenCode, Claude Desktop, VS Code)
+                    User
+                     │
+                     ▼
 
-              MCP (stdio)
+                Smart Router
+                     │
+                     ▼
 
-                   │
+                   AI.KB
+                     │
+                     ▼
 
-             ASR MCP Server
+              Agent Task Layer
+                     │
+                     ▼
 
-                   │
+              Smart Preemption
+                     │
+                     ▼
 
-           Tool Dispatcher
+                ASR Runtime
+                     │
+                     ▼
 
-    ┌─────────┬──────────┬──────────┐
-    │         │          │          │
- Modules   Search   Reference   Workflow
+             Executor Registry
+                     │
+                     ▼
 
-                   │
-
-               ASR Core
+                MCP Services
 ```
 
-ASR separates AI reasoning from tool execution. The AI client decides **when** to use a tool, while ASR executes the request and returns deterministic results.
+ASR separates reasoning from execution.
+
+The AI client decides **what** to solve.
+
+ASR decides **how** to coordinate execution.
+
+The language model focuses on reasoning while ASR handles routing, orchestration, context reuse, and deterministic execution.
 
 ---
 
-# What ASR Provides
+# Smart Preemption
 
-ASR is built around reusable MCP tools.
+Smart Preemption is ASR's deterministic orchestration layer.
 
-Examples include:
+Agents submit reasoning demands instead of calling language models directly.
 
-* Module discovery
-* Documentation search
-* Reference retrieval
-* Workflow execution
-* Project knowledge lookup
-* Structured JSON responses
-* Custom MCP tools
-* Plugin-ready architecture
+Smart Preemption evaluates lightweight decision factors to determine the next best action.
 
-Every capability is exposed through MCP using consistent request and response formats.
+Possible actions include:
+
+* Continue execution
+* Wait for dependencies
+* Reuse AI.KB context
+* Merge compatible requests
+* Request reasoning
+* Complete the task
+
+Smart Preemption is designed to:
+
+* Minimize token consumption
+* Maximize parallel execution
+* Reuse previous reasoning
+* Avoid duplicate work
+* Prevent orchestration bottlenecks
+
+---
+
+# AI.KB Working Memory
+
+AI.KB acts as ASR's operational memory.
+
+It stores runtime state rather than model weights.
+
+Examples:
+
+* Current task state
+* Current agent state
+* Shared context
+* Dependency status
+* Confidence values
+* Previous results
+* Runtime metrics
+* Cache availability
+* Workflow summaries
+* Engineering rules
+
+AI.KB allows ASR to improve orchestration efficiency without retraining the language model.
 
 ---
 
 # Core Principles
 
-### MCP First
+## MCP First
 
-Every feature is designed as an MCP tool from the beginning.
+Every capability is exposed as an MCP tool.
 
-### Deterministic
+## Deterministic
 
-When a tool can answer a request, ASR returns structured data instead of relying on generated text.
+When a tool can answer a request, ASR returns structured data instead of generated text.
 
-### Modular
+## Provider Agnostic
 
-Each service is independent, making it easy to add new capabilities without modifying the core server.
+ASR works with any MCP-compatible client and any reasoning provider.
 
-### AI Friendly
+## Modular
 
-ASR extends AI assistants with reliable capabilities while allowing the language model to focus on reasoning and decision making.
+Capabilities can be added without changing the core runtime.
+
+## AI Friendly
+
+ASR extends AI assistants with reliable capabilities while allowing the language model to focus on reasoning.
+
+## Raspberry Pi First
+
+Every feature is designed to run efficiently on constrained hardware and scale upward without changing the architecture.
+
+---
+
+# Smart Preemption Design Rules
+
+* Keep the hot path O(1)
+* Prefer AI.KB over new reasoning
+* Prefer shared reasoning over duplicate reasoning
+* Keep decisions deterministic
+* Keep agents working in parallel
+* Minimize token consumption
+* Prevent Smart Preemption from becoming a bottleneck
 
 ---
 
 # Compatible Clients
 
-ASR is designed to work with any MCP-compatible client, including:
+ASR works with any MCP-compatible client, including:
 
 * OpenCode
 * Claude Desktop
 * Visual Studio Code
-* Custom AI Agents
+* Custom AI agents
+* Local AI runtimes
 * Future MCP-enabled applications
 
 ---
 
-# Vision
+# Project Vision
 
-ASR is designed to become a reusable MCP platform for AI applications.
+ASR is designed to become a reusable orchestration platform for AI applications.
 
-Rather than embedding business logic inside a language model, ASR exposes reusable tools that any AI client can invoke through the Model Context Protocol.
+Instead of embedding business logic inside a language model, ASR exposes reusable capabilities that any AI client can invoke through MCP.
 
 The goal is simple:
 
 * Reliable tools
-* Deterministic results
-* Clean architecture
+* Deterministic execution
+* Efficient orchestration
 * Reusable services
-* AI that works with trusted capabilities instead of guesswork
+* Parallel execution
+* Lower token costs
+* Clean architecture
+* AI systems built on trusted capabilities instead of guesswork
 
 ---
 
@@ -133,7 +206,16 @@ The goal is simple:
 
 ASR is under active development.
 
-The initial release focuses on delivering a fast, reliable, and extensible MCP server with a growing collection of deterministic tools for AI assistants.
+Current development focuses on:
+
+* Deterministic MCP services
+* Smart Preemption
+* AI.KB working memory
+* Parallel agent coordination
+* Runtime optimization
+* Token efficiency
+* Raspberry Pi deployment
+* Desktop and cloud scalability
 
 ---
 
