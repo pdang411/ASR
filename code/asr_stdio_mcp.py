@@ -341,6 +341,76 @@ async def on_list_tools(_ctx, _params):
                     "additionalProperties": False,
                 },
             ),
+            # ASR Foundation tools
+            types.Tool(
+                name="runtime.execute",
+                description="Execute tasks in the ASR runtime environment.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "task_id": {"type": "string"},
+                        "data": {"type": "object"}
+                    },
+                    "required": ["task_id"],
+                    "additionalProperties": False,
+                },
+            ),
+            types.Tool(
+                name="module.manager",
+                description="Manage ASR modules and plugins.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "action": {"type": "string", "enum": ["list", "info"]},
+                        "module_name": {"type": "string"}
+                    },
+                    "required": ["action"],
+                    "additionalProperties": False,
+                },
+            ),
+            types.Tool(
+                name="workflow.execute",
+                description="Execute ASR workflows.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "workflow_id": {"type": "string"}
+                    },
+                    "required": ["workflow_id"],
+                    "additionalProperties": False,
+                },
+            ),
+            # Plugin management tools
+            types.Tool(
+                name="plugin.list",
+                description="List all ASR Foundation plugins.",
+                inputSchema={"type": "object", "properties": {}, "additionalProperties": False},
+            ),
+            types.Tool(
+                name="plugin.get",
+                description="Get information about a specific ASR plugin.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "plugin_name": {"type": "string"}
+                    },
+                    "required": ["plugin_name"],
+                    "additionalProperties": False,
+                },
+            ),
+            types.Tool(
+                name="plugin.manager",
+                description="Manage ASR plugins.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "action": {"type": "string", "enum": ["list", "info", "enable", "disable"]},
+                        "plugin_name": {"type": "string"}
+                    },
+                    "required": ["action"],
+                    "additionalProperties": False,
+                },
+            ),
         ]
     )
 
@@ -424,6 +494,37 @@ async def on_call_tool(_ctx, params):
             return types.CallToolResult(content=[types.TextContent(text=_canonical_text(result))])
         except Exception as e:
             return types.CallToolResult(content=[types.TextContent(text=f"module.list failure: {e}")], isError=True)
+
+    if name == "asr.plugin.list":
+        try:
+            plugin_url = f"{ASR_BASE_URL}/plugin/list"
+            result = _get_json(plugin_url, cache_key=f"GET:{plugin_url}")
+            return types.CallToolResult(content=[types.TextContent(text=_canonical_text(result))])
+        except Exception as e:
+            return types.CallToolResult(content=[types.TextContent(text=f"plugin.list failure: {e}")], isError=True)
+
+    if name == "asr.plugin.get":
+        plugin_name = args.get("plugin_name", "")
+        if not isinstance(plugin_name, str) or not plugin_name:
+            return types.CallToolResult(content=[types.TextContent(text="Missing required field: plugin_name")], isError=True)
+        try:
+            plugin_url = f"{ASR_BASE_URL}/plugin/get/{urllib.parse.quote(plugin_name, safe='')}"
+            result = _get_json(plugin_url, cache_key=f"GET:{plugin_url}")
+            return types.CallToolResult(content=[types.TextContent(text=_canonical_text(result))])
+        except Exception as e:
+            return types.CallToolResult(content=[types.TextContent(text=f"plugin.get failure: {e}")], isError=True)
+
+    if name == "asr.plugin.manager":
+        payload = {}
+        if isinstance(args.get("action"), str):
+            payload["action"] = args["action"]
+        if isinstance(args.get("plugin_name"), str):
+            payload["plugin_name"] = args["plugin_name"]
+        try:
+            result = _post_json(f"{ASR_BASE_URL}/plugin/manager", payload)
+            return types.CallToolResult(content=[types.TextContent(text=_canonical_text(result))])
+        except Exception as e:
+            return types.CallToolResult(content=[types.TextContent(text=f"plugin.manager failure: {e}")], isError=True)
 
     if name == "asr.transcribe":
         payload = {}
