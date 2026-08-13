@@ -1,4 +1,5 @@
 # Runtime integration
+import time
 
 from agent_task.task_request import TaskRequest
 from agent_task.task_classifier import TaskClassifier
@@ -53,6 +54,76 @@ session_manager = None
 keepalive = None
 session_pool = SessionPool()
 model_switcher = ModelSwitcher()
+
+
+def execute_task_with_performance(task, runtime, smart_pipeline, optimizer, profiler, health, aikb=None):
+    """Execute a task with lightweight profiling and fast O(1) preemption."""
+    from runtime.smart_preemption import RuntimeOptimizer as SmartRuntimeOptimizer
+    from runtime.smart_preemption import RuntimeState as SmartRuntimeState
+    from runtime.smart_preemption import ensure_runtime_cache, fast_decision
+
+    profiler.start("request")
+
+    runtime_state = ensure_runtime_cache(getattr(aikb, "runtime_state", {}) if aikb is not None else {})
+    interval = runtime_state.get("optimizer_interval_seconds", 5.0)
+    now = time.time()
+    last_update = float(runtime_state.get("last_update", 0.0))
+
+    if now - last_update >= float(interval):
+        if aikb is not None:
+            SmartRuntimeOptimizer().update(aikb)
+        runtime_state["last_update"] = now
+
+    scores = runtime_state.get("scores")
+    if not isinstance(scores, SmartRuntimeState):
+        scores = SmartRuntimeState()
+        runtime_state["scores"] = scores
+
+    action = fast_decision(scores)
+
+    # Preserve the smart pipeline mode contract for preemption decisions.
+    try:
+        task.mode = "smart"
+    except Exception:
+        object.__setattr__(task, "mode", "smart")
+
+    if action == "complete":
+        result = {
+            "id": "task-complete-from-context",
+            "status": "ready",
+            "pipeline": {
+                "preemption": {
+                    "mode": "fast_o1",
+                    "action": action,
+                }
+            },
+        }
+    elif action in {"reuse_context", "merge_requests"}:
+        result = runtime.execute(task)
+        if isinstance(result, dict):
+            result.setdefault("pipeline", {})
+            result["pipeline"]["preemption"] = {"mode": "fast_o1", "action": action}
+    else:
+        # Optional optimizer switch can still force runtime fast path.
+        if hasattr(optimizer, "use_fast_path") and optimizer.use_fast_path(getattr(task, "intent", "")):
+            result = runtime.execute(task)
+        else:
+            result = smart_pipeline.execute(task)
+        if isinstance(result, dict):
+            result.setdefault("pipeline", {})
+            result["pipeline"]["preemption"] = {"mode": "fast_o1", "action": action}
+
+    runtime_state.setdefault("decision_history", []).append(
+        {
+            "action": action,
+            "mode": "fast_o1",
+            "timestamp": now,
+        }
+    )
+
+    elapsed_ms = profiler.stop("request")
+    health.update("runtime", elapsed_ms, True)
+    return result, elapsed_ms
 
 def setup_llm_session(provider):
     """Setup LLM session management at startup"""

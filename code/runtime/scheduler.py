@@ -1,18 +1,25 @@
 def select_reasoning_service(task, registry):
     ready = [
-        r for r in registry.ready()
-        if task.required_capability in r["capabilities"]
+        service
+        for service in registry.ready()
+        if (
+            not getattr(task, "required_capability", None)
+            or getattr(task, "required_capability", None)
+            in service.get("capabilities", [])
+        )
     ]
+
+    if not ready:
+        return None
 
     ready.sort(
         key=lambda r: (
-            r["provider_score"],
-            -r["avg_tokens_per_sec"],
-            r["avg_latency_ms"],
-            r["queue_depth"],
-            -r["success_rate"]
+            r.get("queue_depth", 0),
+            r.get("avg_latency_ms", 0),
+            -r.get("avg_tokens_per_sec", 0),
+            -r.get("success_rate", 0),
+            -r.get("provider_score", 0),
         ),
-        reverse=True
     )
 
-    return ready[0] if ready else None
+    return ready[0]

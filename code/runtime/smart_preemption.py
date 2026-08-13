@@ -1,8 +1,12 @@
+import inspect
 from dataclasses import dataclass
 from typing import Any
 
 from runtime.chart_dispatch import ChartDispatcher
 from runtime.markdown_renderer import MarkdownRenderer
+from runtime.preemption_capabilities import SMART_PREEMPTION_CAPABILITIES
+from runtime.preemption_flash import PreemptionFlash
+from runtime.preemption_state import PreemptionState
 from runtime.visualization import VisualizationLevel
 from runtime.visualization_selector import VisualizationSelector
 from runtime.visualization_state import VisualizationState
@@ -284,17 +288,202 @@ class SmartPreemption:
         default_weights: dict[str, float] | None = None,
         runtime_state: Any | None = None,
         registry: Any | None = None,
+        ai_kb: Any | None = None,
+        result_cache: Any | None = None,
+        reasoning_registry: Any | None = None,
+        executor_registry: Any | None = None,
     ):
         self.default_weights = dict(self.DEFAULT_WEIGHTS)
-        self.state = runtime_state
+        self.runtime_state = runtime_state
         self.registry = registry
+        self.ai_kb = ai_kb
+        self.result_cache = result_cache
+        self.reasoning_registry = reasoning_registry
+        self.executor_registry = executor_registry if executor_registry is not None else registry
         self.visualization_selector = VisualizationSelector()
         self.markdown_renderer = MarkdownRenderer()
         self.chart_dispatcher = ChartDispatcher()
+
+        self.preemption_state = PreemptionState()
+        self.preemption_state.capabilities = dict(SMART_PREEMPTION_CAPABILITIES)
+        self.flash = PreemptionFlash(self.preemption_state)
+        self._cached_flash = ""
+
         if isinstance(default_weights, dict):
             for key, value in default_weights.items():
                 if key in self.default_weights and isinstance(value, (int, float)):
                     self.default_weights[key] = float(value)
+
+    @property
+    def state(self):
+        return self.preemption_state
+
+    @property
+    def capabilities(self):
+        return dict(self.preemption_state.capabilities)
+
+    async def initialize(self):
+        """Boot-time initialization and first cached FLASH generation."""
+        s = self.preemption_state
+        s.status = "READY"
+        s.mode = "DETERMINISTIC"
+        s.hot_path = "ACTIVE"
+        s.cycle_count = 0
+        s.mark_changed()
+        self._refresh_flash()
+
+    def _refresh_flash(self):
+        # Pure local formatting: no network or reasoning operations.
+        self._cached_flash = self.flash.build()
+
+    def _state_snapshot(self):
+        s = self.preemption_state
+        m = s.metrics
+        return (
+            s.status,
+            s.last_decision,
+            s.last_reason,
+            s.last_task_id,
+            s.cycle_count,
+            m.active_demands,
+            m.queued_demands,
+            m.waiting_dependencies,
+            m.cache_hits,
+            m.cache_misses,
+            m.ai_kb_reuses,
+            m.reasoning_reuses,
+            m.requests_merged,
+            m.duplicate_work_avoided,
+            m.llm_requests,
+            m.completed_tasks,
+            m.failed_tasks,
+            m.decisions_total,
+            m.retries,
+        )
+
+    async def _await_maybe(self, value):
+        if inspect.isawaitable(value):
+            return await value
+        return value
+
+    async def run_cycle(self, demand):
+        """Existing deterministic cycle with change-triggered FLASH refresh."""
+        before = self._state_snapshot()
+
+        s = self.preemption_state
+        m = s.metrics
+        s.cycle_count += 1
+        s.last_task_id = getattr(demand, "task_id", None)
+        m.active_demands = max(1, int(m.active_demands))
+
+        decision = "FAIL"
+        reason = "Unhandled preemption error"
+        try:
+            decision, reason = await self._evaluate(demand)
+        except Exception as exc:
+            reason = str(exc)
+            m.failed_tasks += 1
+
+        s.last_decision = decision
+        s.last_reason = reason
+        m.decisions_total += 1
+
+        if decision in {"REUSE_RESULT", "COMPLETE"}:
+            m.completed_tasks += 1
+        elif decision == "RETRY":
+            m.retries += 1
+        elif decision == "FAIL":
+            m.failed_tasks += 1
+
+        after = self._state_snapshot()
+        if after != before:
+            s.mark_changed()
+            self._refresh_flash()
+
+        return decision
+
+    async def _evaluate(self, demand):
+        """Deterministic hierarchy preserving existing integration points."""
+        m = self.preemption_state.metrics
+
+        if self.result_cache is not None and hasattr(self.result_cache, "get"):
+            result = await self._await_maybe(self.result_cache.get(demand))
+            if result is not None:
+                m.cache_hits += 1
+                return "REUSE_RESULT", "Existing result found"
+            m.cache_misses += 1
+
+        if self.ai_kb is not None and hasattr(self.ai_kb, "lookup"):
+            context = await self._await_maybe(self.ai_kb.lookup(demand))
+            if context is not None:
+                m.ai_kb_reuses += 1
+                return "REUSE_AI_KB", "Reusable AI.KB context found"
+
+        if self.reasoning_registry is not None and hasattr(self.reasoning_registry, "find_reusable"):
+            reusable = await self._await_maybe(self.reasoning_registry.find_reusable(demand))
+            if reusable is not None:
+                m.reasoning_reuses += 1
+                return "REUSE_REASONING", "Reusable reasoning found"
+
+        merged = await self._try_merge(demand)
+        if merged:
+            m.requests_merged += 1
+            m.duplicate_work_avoided += 1
+            return "MERGE_REQUEST", "Compatible demand merged"
+
+        if await self._has_pending_dependency(demand):
+            m.waiting_dependencies += 1
+            return "WAIT_DEPENDENCY", "Required dependency is pending"
+
+        service = self._select_reasoning_service()
+        if service is None:
+            m.queued_demands += 1
+            return "QUEUE", "No ready reasoning service"
+
+        m.llm_requests += 1
+        return "DISPATCH", f"Selected reasoning service: {service}"
+
+    async def _try_merge(self, demand):
+        _ = demand
+        return False
+
+    async def _has_pending_dependency(self, demand):
+        _ = demand
+        return False
+
+    def _service_field(self, service: Any, name: str, default: Any):
+        if isinstance(service, dict):
+            return service.get(name, default)
+        return getattr(service, name, default)
+
+    def _select_reasoning_service(self):
+        registry = self.reasoning_registry or self.executor_registry
+        if registry is None or not hasattr(registry, "list"):
+            return None
+
+        services = registry.list()
+        candidates = [s for s in services if self._service_field(s, "status", None) == "READY"]
+        if not candidates:
+            return None
+
+        candidates.sort(
+            key=lambda s: (
+                self._service_field(s, "queue_depth", 0),
+                self._service_field(s, "avg_latency_ms", 0.0),
+                -self._service_field(s, "avg_tokens_per_sec", 0.0),
+                -self._service_field(s, "success_rate", 0.0),
+                -self._service_field(s, "provider_score", 0.0),
+            )
+        )
+        top = candidates[0]
+        provider = self._service_field(top, "provider_id", None) or self._service_field(top, "provider", "service")
+        model = self._service_field(top, "model", None)
+        endpoint = self._service_field(top, "endpoint", None)
+        if model:
+            return f"{provider}:{model}"
+        if endpoint:
+            return f"{provider}@{endpoint}"
+        return str(provider)
 
     def _visualization_requested(self, task) -> bool:
         media_type = str(getattr(task, "media_type", "") or "").strip().lower()
@@ -321,20 +510,20 @@ class SmartPreemption:
 
     def handle(self, task):
         """Dispatch UniversalTask via adapter registry using O(1) cache lookup only."""
-        if self.state is None or self.registry is None:
+        if self.runtime_state is None or self.registry is None:
             raise RuntimeError("SmartPreemption handle() requires runtime_state and registry")
 
-        pipeline_cache = getattr(self.state, "pipeline_cache", {})
+        pipeline_cache = getattr(self.runtime_state, "pipeline_cache", {})
         if isinstance(pipeline_cache, dict):
             cached = pipeline_cache.get(getattr(task, "intent", ""))
             if isinstance(cached, str) and cached:
                 task.pipeline = cached
 
         if self._visualization_requested(task):
-            state = getattr(self.state, "visualization_state", None)
+            state = getattr(self.runtime_state, "visualization_state", None)
             if state is None:
                 state = VisualizationState()
-                setattr(self.state, "visualization_state", state)
+                setattr(self.runtime_state, "visualization_state", state)
 
             level = self.visualization_selector.select(task, state)
             state.cache_hits += 1
@@ -512,3 +701,38 @@ class SmartPreemption:
             weights=weights,
             token_estimate=self._estimate_tokens(task),
         )
+
+    def status(self):
+        """Return live preemption status with cached FLASH announcement."""
+        s = self.preemption_state
+        m = s.metrics
+        return {
+            "status": s.status,
+            "mode": s.mode,
+            "hot_path": s.hot_path,
+            "cycle_count": s.cycle_count,
+            "announcement_version": s.announcement_version,
+            "current_decision": {
+                "decision": s.last_decision,
+                "reason": s.last_reason,
+                "task_id": s.last_task_id,
+            },
+            "capabilities": dict(s.capabilities),
+            "metrics": {
+                "active_demands": m.active_demands,
+                "queued_demands": m.queued_demands,
+                "waiting_dependencies": m.waiting_dependencies,
+                "cache_hits": m.cache_hits,
+                "cache_misses": m.cache_misses,
+                "ai_kb_reuses": m.ai_kb_reuses,
+                "reasoning_reuses": m.reasoning_reuses,
+                "requests_merged": m.requests_merged,
+                "duplicate_work_avoided": m.duplicate_work_avoided,
+                "llm_requests": m.llm_requests,
+                "completed_tasks": m.completed_tasks,
+                "failed_tasks": m.failed_tasks,
+                "decisions_total": m.decisions_total,
+                "retries": m.retries,
+            },
+            "announcement": self._cached_flash,
+        }
