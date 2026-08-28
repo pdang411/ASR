@@ -1332,14 +1332,44 @@ async def on_call_tool(_ctx, params):
     )
 
 
-server = Server(
-    name="asr",
-    version="0.1.0",
-    on_list_tools=on_list_tools,
-    on_call_tool=on_call_tool,
-    on_list_resources=on_list_resources,
-    on_read_resource=on_read_resource,
-)
+server = Server(name="asr", version="0.1.0")
+
+
+@server.list_tools()
+async def list_tools() -> list[types.Tool]:
+    result = await on_list_tools(None, None)
+    return result.tools
+
+
+@server.call_tool()
+async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+    class Params:
+        pass
+
+    params = Params()
+    params.name = name
+    params.arguments = arguments
+    result = await on_call_tool(None, params)
+    return result.content
+
+
+@server.list_resources()
+async def list_resources() -> list[types.Resource]:
+    result = await on_list_resources(None, None)
+    return result.resources
+
+
+@server.read_resource()
+async def read_resource(uri: str) -> str:
+    class Params:
+        pass
+
+    params = Params()
+    params.uri = uri
+    result = await on_read_resource(None, params)
+    if result.contents and isinstance(result.contents[0], types.TextResourceContents):
+        return result.contents[0].text
+    return ""
 
 
 _seed_runtime_announcement_state()

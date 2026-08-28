@@ -377,12 +377,25 @@ async def on_call_tool(_ctx, params):
     )
 
 
-server = Server(
-    name="asr",
-    version="0.1.0",
-    on_list_tools=on_list_tools,
-    on_call_tool=on_call_tool,
-)
+server = Server(name="asr", version="0.1.0")
+
+
+@server.list_tools()
+async def list_tools() -> list[types.Tool]:
+    result = await on_list_tools(None, None)
+    return result.tools
+
+
+@server.call_tool()
+async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+    class Params:
+        pass
+
+    params = Params()
+    params.name = name
+    params.arguments = arguments
+    result = await on_call_tool(None, params)
+    return result.content
 
 
 async def main():
