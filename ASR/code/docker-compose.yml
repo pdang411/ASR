@@ -8,7 +8,7 @@ services:
       dockerfile: Dockerfile.mcp-server
     restart: unless-stopped
     ports:
-      - "8600:8600"
+      - "8700:8700"
     environment:
       - ENV=production
     volumes:
@@ -49,8 +49,8 @@ services:
     image: nginx:alpine
     restart: unless-stopped
     ports:
-      - "8600:80"
-      - "8601:443"
+      - "8080:80"
+      - "8443:443"
     volumes:
       - ./config/nginx:/etc/nginx/conf.d
       - ./certs:/etc/nginx/certs

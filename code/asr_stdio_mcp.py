@@ -35,7 +35,7 @@ from agent_task.task_classifier import TaskClassifier
 from agent_task.task_capabilities import Capability
 from agent_task.task_request import TaskRequest
 
-ASR_BASE_URL = os.environ.get("ASR_MCP_BASE_URL", "http://asr-mcp-server:8600").rstrip("/")
+ASR_BASE_URL = os.environ.get("ASR_MCP_BASE_URL", "http://mcp-server:8700").rstrip("/")
 ASR_HTTP_TIMEOUT_SECONDS = float(os.environ.get("ASR_HTTP_TIMEOUT_SECONDS", "8"))
 ASR_HTTP_RETRIES = max(0, int(os.environ.get("ASR_HTTP_RETRIES", "1")))
 ASR_CACHE_TTL_SECONDS = max(0.0, float(os.environ.get("ASR_CACHE_TTL_SECONDS", "1.5")))

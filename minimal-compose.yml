@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile.mcp-server
     restart: unless-stopped
     ports:
-      - "8600:8600"
+      - "8700:8700"
     environment:
       - ENV=production
     volumes:

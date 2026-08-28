@@ -14,7 +14,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 import mcp.types as types
 
-ASR_BASE_URL = os.environ.get("ASR_MCP_BASE_URL", "http://asr-mcp-server:8600").rstrip("/")
+ASR_BASE_URL = os.environ.get("ASR_MCP_BASE_URL", "http://mcp-server:8700").rstrip("/")
 
 TOOL_ALIASES = {
     "memory.build": "asr.memory.build",

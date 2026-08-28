@@ -159,5 +159,5 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    # Run on port 8600 for local development
-    app.run(host='0.0.0.0', port=8600, debug=False)
+    # Run on port 8700 for local development
+    app.run(host='0.0.0.0', port=8700, debug=False)
