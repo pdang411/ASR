@@ -290,6 +290,8 @@ The language model performs the reasoning.
 
 **ASR provides deterministic services, orchestration, runtime intelligence, working memory, and trusted execution.**
 
+8-28-26 update ARS port to 8700 
+
 ---
 
 # License
